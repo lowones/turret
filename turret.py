@@ -80,10 +80,18 @@ def main():
 #    index = locate(x_stepper, x, markers)
 #    sweep(x_stepper, x, markers)
 #    sweep(x_stepper, x, markers, soft_min=5, soft_max=230)
-    sweep(y_stepper, y, markers, soft_max=230)
-#    goto_coord(990, index,  x_stepper, x, markers)
-#    goto_coord(170, index,  y_stepper, y, markers)
+#    sweep(y_stepper, y, markers, soft_max=230)
+#    goto_coord(790, index,  x_stepper, x, markers)
+#    goto_coord(70, index,  y_stepper, y, markers)
 #    shoot(flywheel, trigger, percent=90, shots=4)
+    waypoint(800, 90, 80, 2, x, y, markers)
+
+def waypoint(x_coord, y_coord, power_level, shots, x, y, markers):
+    power_supply_on()
+    goto_coord(x_coord, index,  x_stepper, x, markers)
+    goto_coord(y_coord, index,  y_stepper, y, markers)
+    shoot(flywheel, trigger, percent=70, shots=2)
+    power_supply_off()
 
 def setup_gpio(atx, x_axis, y_axis, markers):
     GPIO.setwarnings(False)
@@ -152,7 +160,8 @@ def locate(stepper, axis, markers):
         print("The located index is %s for marker %s" % (index, triggered) )
     finally:
 #        GPIO.cleanup()
-        power_supply_off()
+#        power_supply_off()
+        pass
     return index
 
 def check_transition(index, dir, triggered, markers):
@@ -209,7 +218,7 @@ def goto_coord(coord, index, stepper, axis, markers):
 
 def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
     power_supply_on()
-    END_SLEEP=1.0
+    END_SLEEP=0.5
     MID_SLEEP=0.1
     print("sweep\n")
     index=0
@@ -225,7 +234,8 @@ def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
     try:
       while True:
         triggered = marker_state(axis, markers)
-        print("triggered %s" % triggered)
+        if triggered != -1:
+            triggered = axis.index(triggered)
         if triggered==0:
           print "MIN"
           dir=1
@@ -264,7 +274,7 @@ def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
         print(index)
     
     finally:
-      GPIO.cleanup()
+#      GPIO.cleanup()
       power_supply_off()
 
 
