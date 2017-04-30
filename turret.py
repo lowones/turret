@@ -12,7 +12,7 @@ STATE=1
 MIN=2
 MAX=3
 
-index = -1  # set to -1 initially for unkown location
+index = x_index = y_index  = -1  # set to -1 initially for unkown location
 
 # create a default object, no changes to I2C address or frequency
 sh = Adafruit_MotorHAT()
@@ -23,6 +23,21 @@ flywheel = mh.getMotor(1)
 trigger = mh.getMotor(2)
 atx_pin = 27
 
+markers = [[17,0,1,1],
+           [20,0,225,245],
+           [16,0,635,660],
+           [12,0,1195,1220],
+           [25,0,1575,1595],
+           [24,0,1810,1810],
+           [26,0,1,1],
+           [19,0,55,70],
+           [13,0,90,105],
+           [6,0,125,140],
+           [5,0,165,185],
+           [22,0,410,410]
+          ]
+x=[0,1,2,3,4,5]
+y=[6,7,8,9,10,11]
 
 def get_power_level(power):
     if power > 100:
@@ -58,47 +73,37 @@ def main_thing():
         time.sleep(10.0)
 
 def main():
-    markers = [[17,0,1,1],
-               [20,0,225,245],
-               [16,0,635,660],
-               [12,0,1195,1220],
-               [25,0,1575,1595],
-               [24,0,1810,1810],
-               [26,0,1,1],
-               [19,0,45,65],
-               [13,0,85,100],
-               [6,0,005,120],
-               [5,0,040,165],
-               [22,0,300,300]
-              ]
-    x=[0,1,2,3,4,5]
-    y=[6,7,8,9,10,11]
     atexit.register(turnOffMotors)
  
-    setup_gpio(atx_pin, x, y, markers)
+    setup_gpio(atx_pin, x, y)
 # COMMANDS
-#    index = locate(x_stepper, x, markers)
-#    sweep(x_stepper, x, markers)
-#    sweep(x_stepper, x, markers, soft_min=5, soft_max=230)
-#    sweep(y_stepper, y, markers, soft_max=230)
-#    goto_coord(790, index,  x_stepper, x, markers)
-#    goto_coord(70, index,  y_stepper, y, markers)
+#    index = locate(x_stepper, x)
+#    sweep(x_stepper, x)
+#    sweep(x_stepper, x, soft_min=5, soft_max=230)
+#    sweep(y_stepper, y, soft_max=230)
+#    goto_coord(790, index,  x_stepper, x)
+#    goto_coord(70, index,  y_stepper, y)
 #    shoot(flywheel, trigger, percent=90, shots=4)
-    waypoint(800, 90, 80, 2, x, y, markers)
+    waypoint(850, 10, 80, 2)
+    waypoint(150, 60, 60, 2)
+    waypoint(1550, 160, 50, 2)
+#    sweep(y_stepper, y, soft_max=822)
 
-def waypoint(x_coord, y_coord, power_level, shots, x, y, markers):
+def waypoint(x_coord, y_coord, power_level, shots):
     power_supply_on()
-    goto_coord(x_coord, index,  x_stepper, x, markers)
-    goto_coord(y_coord, index,  y_stepper, y, markers)
+    index = x_index
+    goto_coord(x_coord, index,  x_stepper, x)
+    index = y_index
+    goto_coord(y_coord, index,  y_stepper, y)
     shoot(flywheel, trigger, percent=70, shots=2)
     power_supply_off()
 
-def setup_gpio(atx, x_axis, y_axis, markers):
+def setup_gpio(atx, x_axis, y_axis):
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(atx, GPIO.OUT, initial=0)
-    setup_markers(x_axis, markers)
-    setup_markers(y_axis, markers)
+    setup_markers(x_axis)
+    setup_markers(y_axis)
 
 def power_supply_on():
     print("turn atx power supply on")
@@ -109,7 +114,7 @@ def power_supply_off():
     print("turn atx power supply off")
     GPIO.output(atx_pin, 0)
 
-def setup_markers(axis, markers):
+def setup_markers(axis):
     print("setup markers")
     for marker in axis:
         print(marker)
@@ -136,7 +141,7 @@ def step(index, motor, direction=-1):
     index+=direction
     return index
 
-def marker_state(axis, markers):
+def marker_state(axis):
     triggered_marker=-1
     count=0
     for marker in axis:
@@ -147,15 +152,15 @@ def marker_state(axis, markers):
                 print("Error multiple markers triggered")
     return triggered_marker
 
-def locate(stepper, axis, markers):
+def locate(stepper, axis):
     index=0
     dir=-1
     power_supply_on()
     try:
-        triggered = marker_state(axis, markers)
+        triggered = marker_state(axis)
         while triggered == -1:
             step(index, stepper, direction=dir)
-            triggered = marker_state(axis, markers)
+            triggered = marker_state(axis)
         index = markers[triggered][MAX]
         print("The located index is %s for marker %s" % (index, triggered) )
     finally:
@@ -164,7 +169,7 @@ def locate(stepper, axis, markers):
         pass
     return index
 
-def check_transition(index, dir, triggered, markers):
+def check_transition(index, dir, triggered):
 #    print("check if any marker has transitioned state")
     if triggered == -1:
         # check if any marker was triggered
@@ -189,21 +194,20 @@ def check_transition(index, dir, triggered, markers):
                 index = markers[triggered][MAX]
     return index
 
-def goto_coord(coord, index, stepper, axis, markers):
+def goto_coord(coord, index, stepper, axis):
     print("Goto axis index specified")
     print("Update index to markers as triggered")
     dir=-1  # set direction to initally move toward MIN
     try:
-        power_supply_on()
         if index == -1:
-            index = locate(stepper, axis, markers)
+            index = locate(stepper, axis)
         if coord > index:
             dir=1
         while index != coord:
             index = step(index, stepper, dir)
             manual_index = index
-            triggered = marker_state(axis, markers)
-            index = check_transition(index, dir, triggered, markers)
+            triggered = marker_state(axis)
+            index = check_transition(index, dir, triggered)
             gap = [manual_index, index]
             gap.sort()
             if coord in range(gap[0], gap[1]):
@@ -213,10 +217,11 @@ def goto_coord(coord, index, stepper, axis, markers):
 #        power_supply_off()
         pass
     print("At index %s" % index)
+    return index
 
 
 
-def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
+def sweep(stepper, axis, soft_min=-5000, soft_max=5000):
     power_supply_on()
     END_SLEEP=0.5
     MID_SLEEP=0.1
@@ -233,7 +238,7 @@ def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
     print("starting sweep")
     try:
       while True:
-        triggered = marker_state(axis, markers)
+        triggered = marker_state(axis)
         if triggered != -1:
             triggered = axis.index(triggered)
         if triggered==0:
