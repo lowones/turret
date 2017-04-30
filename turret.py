@@ -20,7 +20,7 @@ mh = Adafruit_MotorHAT(addr=0x61)
 x_stepper = sh.getStepper(200, 1)  # 200 steps/rev, motor port #2
 y_stepper = sh.getStepper(200, 2)  # 200 steps/rev, motor port #2
 flywheel = mh.getMotor(1)
-trigger = mh.getMotor(2)
+trigger = mh.getMotor(3)
 atx_pin = 27
 
 markers = [[17,0,1,1],
@@ -52,7 +52,7 @@ def shoot(F, T, percent=100, shots=1):
     print("shoot gun")
     trigger_power=100
 #    trigger_power=255
-    power_on_delay=4.0
+    power_on_delay=6.0
     one_shot_time=0.15
     shot_duration=shots*one_shot_time
     power=get_power_level(percent)
@@ -81,29 +81,36 @@ def main():
 #    sweep(x_stepper, x)
 #    sweep(x_stepper, x, soft_min=5, soft_max=230)
 #    sweep(y_stepper, y, soft_max=230)
-#    goto_coord(790, index,  x_stepper, x)
-#    goto_coord(70, index,  y_stepper, y)
+#    goto_coord(790, x_stepper, x)
+#    goto_coord(70, y_stepper, y)
 #    shoot(flywheel, trigger, percent=90, shots=4)
-    waypoint(850, 10, 80, 2)
-    waypoint(150, 60, 60, 2)
-    waypoint(1550, 160, 50, 2)
+    waypoint(820, 155, 100, 4)
+#    waypoint(200, 220, 60, 2)
+#    waypoint(1550, 160, 50, 2)
 #    sweep(y_stepper, y, soft_max=822)
+#    sweep(x_stepper, x)
 
 def waypoint(x_coord, y_coord, power_level, shots):
+    global index
+    global x_index
+    global y_index
     power_supply_on()
     index = x_index
-    goto_coord(x_coord, index,  x_stepper, x)
+    print("goto X %s" % x_coord)
+    x_index = goto_coord(x_coord, x_stepper, x)
     index = y_index
-    goto_coord(y_coord, index,  y_stepper, y)
-    shoot(flywheel, trigger, percent=70, shots=2)
+    print("goto Y %s" % y_coord)
+    y_index = goto_coord(y_coord, y_stepper, y)
+    shoot(flywheel, trigger, power_level, shots)
+    time.sleep(2.0)
     power_supply_off()
 
 def setup_gpio(atx, x_axis, y_axis):
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(atx, GPIO.OUT, initial=0)
-    setup_markers(x_axis)
-    setup_markers(y_axis)
+    for marker in markers:
+        setup_gpio_input(marker[PIN])
 
 def power_supply_on():
     print("turn atx power supply on")
@@ -113,12 +120,6 @@ def power_supply_on():
 def power_supply_off():
     print("turn atx power supply off")
     GPIO.output(atx_pin, 0)
-
-def setup_markers(axis):
-    print("setup markers")
-    for marker in axis:
-        print(marker)
-        setup_gpio_input(markers[marker][PIN])
 
 def setup_gpio_input(pin):
     print("set pin %s as an input" % pin)
@@ -130,7 +131,8 @@ def turnOffMotors():
         sh.getMotor(i).run(Adafruit_MotorHAT.RELEASE)
         mh.getMotor(i).run(Adafruit_MotorHAT.RELEASE)
 
-def step(index, motor, direction=-1):
+def step(motor, direction=-1):
+    global index
     if direction ==  -1:
         DIR=Adafruit_MotorHAT.BACKWARD
     elif direction == 1:
@@ -153,13 +155,13 @@ def marker_state(axis):
     return triggered_marker
 
 def locate(stepper, axis):
-    index=0
+    global index
     dir=-1
     power_supply_on()
     try:
         triggered = marker_state(axis)
         while triggered == -1:
-            step(index, stepper, direction=dir)
+            step(stepper, direction=dir)
             triggered = marker_state(axis)
         index = markers[triggered][MAX]
         print("The located index is %s for marker %s" % (index, triggered) )
@@ -169,8 +171,8 @@ def locate(stepper, axis):
         pass
     return index
 
-def check_transition(index, dir, triggered):
-#    print("check if any marker has transitioned state")
+def check_transition(dir, triggered):
+    global index
     if triggered == -1:
         # check if any marker was triggered
         for marker in markers:
@@ -194,7 +196,8 @@ def check_transition(index, dir, triggered):
                 index = markers[triggered][MAX]
     return index
 
-def goto_coord(coord, index, stepper, axis):
+def goto_coord(coord, stepper, axis):
+    global index
     print("Goto axis index specified")
     print("Update index to markers as triggered")
     dir=-1  # set direction to initally move toward MIN
@@ -204,10 +207,11 @@ def goto_coord(coord, index, stepper, axis):
         if coord > index:
             dir=1
         while index != coord:
-            index = step(index, stepper, dir)
+            index = step(stepper, dir)
+            print(index)
             manual_index = index
             triggered = marker_state(axis)
-            index = check_transition(index, dir, triggered)
+            index = check_transition(dir, triggered)
             gap = [manual_index, index]
             gap.sort()
             if coord in range(gap[0], gap[1]):
@@ -222,11 +226,11 @@ def goto_coord(coord, index, stepper, axis):
 
 
 def sweep(stepper, axis, soft_min=-5000, soft_max=5000):
+    global index
     power_supply_on()
     END_SLEEP=0.5
     MID_SLEEP=0.1
     print("sweep\n")
-    index=0
     dir=-1
     print("soft_min = %s" % soft_min)
     print("soft_max = %s" % soft_max)
@@ -234,7 +238,7 @@ def sweep(stepper, axis, soft_min=-5000, soft_max=5000):
     print("resetting to MIN")
     mk_min=markers[axis[0]][PIN]
     while GPIO.input(mk_min)==1:
-        step(index, stepper, direction=dir)
+        step(stepper, direction=dir)
     print("starting sweep")
     try:
       while True:
@@ -271,11 +275,9 @@ def sweep(stepper, axis, soft_min=-5000, soft_max=5000):
           print "mk-4"
           time.sleep(MID_SLEEP)
         else:
-#          print "step"
           pass
 
-#        index=index+dir
-        index = step(index, stepper, direction=dir)
+        index = step(stepper, direction=dir)
         print(index)
     
     finally:
