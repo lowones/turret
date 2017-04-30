@@ -145,8 +145,13 @@ def goto_coord(coord, index, stepper, axis, markers):
             dir=1
         while index != coord:
             index = step(index, stepper, dir)
+            manual_index = index
             triggered = marker_state(axis, markers)
             index = check_transition(index, dir, triggered, markers)
+            gap = [manual_index, index]
+            gap.sort()
+            if coord in range(gap[0], gap[1]):
+                index = coord
     finally:
 #        GPIO.cleanup()
         power_supply_off()
