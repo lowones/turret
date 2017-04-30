@@ -21,6 +21,7 @@ x_stepper = sh.getStepper(200, 1)  # 200 steps/rev, motor port #2
 y_stepper = sh.getStepper(200, 2)  # 200 steps/rev, motor port #2
 flywheel = mh.getMotor(1)
 trigger = mh.getMotor(2)
+atx_pin = 27
 
 
 def get_power_level(power):
@@ -32,6 +33,7 @@ def get_power_level(power):
     return level
 
 def shoot(F, T, percent=100, shots=1):
+    power_supply_on()
     print("shoot gun")
     trigger_power=100
 #    trigger_power=255
@@ -47,6 +49,7 @@ def shoot(F, T, percent=100, shots=1):
     time.sleep(shot_duration)
     T.run(Adafruit_MotorHAT.RELEASE)
     F.run(Adafruit_MotorHAT.RELEASE)
+    power_supply_off()
 
 def main_thing():
 
@@ -70,25 +73,33 @@ def main():
               ]
     x=[0,1,2,3,4,5]
     y=[6,7,8,9,10,11]
-    GPIO.setmode(GPIO.BCM)
     atexit.register(turnOffMotors)
  
-    setup_markers(x, markers)
-    setup_markers(y, markers)
+    setup_gpio(atx_pin, x, y, markers)
 # COMMANDS
 #    index = locate(x_stepper, x, markers)
 #    sweep(x_stepper, x, markers)
 #    sweep(x_stepper, x, markers, soft_min=5, soft_max=230)
-#    sweep(y_stepper, y, markers, soft_max=230)
-    goto_coord(730, index,  x_stepper, x, markers)
-    goto_coord(150, index,  y_stepper, y, markers)
-    shoot(flywheel, trigger, percent=90, shots=4)
+    sweep(y_stepper, y, markers, soft_max=230)
+#    goto_coord(990, index,  x_stepper, x, markers)
+#    goto_coord(170, index,  y_stepper, y, markers)
+#    shoot(flywheel, trigger, percent=90, shots=4)
+
+def setup_gpio(atx, x_axis, y_axis, markers):
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(atx, GPIO.OUT, initial=0)
+    setup_markers(x_axis, markers)
+    setup_markers(y_axis, markers)
 
 def power_supply_on():
     print("turn atx power supply on")
+    GPIO.output(atx_pin, 1)
+    time.sleep(0.5)
 
 def power_supply_off():
     print("turn atx power supply off")
+    GPIO.output(atx_pin, 0)
 
 def setup_markers(axis, markers):
     print("setup markers")
@@ -190,7 +201,8 @@ def goto_coord(coord, index, stepper, axis, markers):
                 index = coord
     finally:
 #        GPIO.cleanup()
-        power_supply_off()
+#        power_supply_off()
+        pass
     print("At index %s" % index)
 
 
@@ -204,14 +216,16 @@ def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
     dir=-1
     print("soft_min = %s" % soft_min)
     print("soft_max = %s" % soft_max)
-    time.sleep(5.0)
+    time.sleep(3.0)
     print("resetting to MIN")
     mk_min=markers[axis[0]][PIN]
     while GPIO.input(mk_min)==1:
         step(index, stepper, direction=dir)
+    print("starting sweep")
     try:
       while True:
         triggered = marker_state(axis, markers)
+        print("triggered %s" % triggered)
         if triggered==0:
           print "MIN"
           dir=1
