@@ -13,6 +13,8 @@ TRAN=2
 MIN=3
 MAX=4
 
+index = -1  # set to -1 initially for unkown location
+
 # create a default object, no changes to I2C address or frequency
 sh = Adafruit_MotorHAT()
 x_stepper = sh.getStepper(200, 1)  # 200 steps/rev, motor port #2
@@ -39,9 +41,11 @@ def main():
     atexit.register(turnOffMotors)
  
     setup_markers(x, markers)
-    sweep(x_stepper, x, markers)
+#    index = locate(x_stepper, x, markers)
+#    sweep(x_stepper, x, markers)
 #    sweep(x_stepper, x, markers, soft_min=5, soft_max=230)
 #    sweep(y_stepper, y, markers, soft_max=230)
+    goto_coord(990, index,  x_stepper, x, markers)
 
 def power_supply_on():
     print("turn atx power supply on")
@@ -64,7 +68,7 @@ def turnOffMotors():
     for i in [1,2,3,4]:
         sh.getMotor(i).run(Adafruit_MotorHAT.RELEASE)
 
-def step(motor, direction=-1):
+def step(index, motor, direction=-1):
     if direction ==  -1:
         DIR=Adafruit_MotorHAT.BACKWARD
     elif direction == 1:
@@ -72,6 +76,8 @@ def step(motor, direction=-1):
     else:
         print("Invalid direction")
     motor.oneStep(DIR,  Adafruit_MotorHAT.INTERLEAVE)
+    index+=direction
+    return index
 
 def marker_state(axis, markers):
     triggered_marker=-1
@@ -83,6 +89,68 @@ def marker_state(axis, markers):
             if count > 1:
                 print("Error multiple markers triggered")
     return triggered_marker
+
+def locate(stepper, axis, markers):
+    index=0
+    dir=-1
+    power_supply_on()
+    try:
+        triggered = marker_state(axis, markers)
+        while triggered == -1:
+            step(index, stepper, direction=dir)
+            triggered = marker_state(axis, markers)
+        index = markers[triggered][MAX]
+        print("The located index is %s for marker %s" % (index, triggered) )
+    finally:
+#        GPIO.cleanup()
+        power_supply_off()
+    return index
+
+def check_transition(index, dir, triggered, markers):
+    print("check if any marker has transitioned state")
+    if triggered == -1:
+        # check if any marker was triggered
+        for marker in markers:
+            if markers[marker][STATE] == 1:
+                markers[marker][STATE] = 0
+                if dir ==  1:
+                    print("adjust")
+                    index = markers[marker][MIN]
+                else:
+                    print("adjust")
+                    index = markers[marker][MAX]
+    else:
+        # check if tiggered was already set
+        if  markers[triggered][STATE] == 0:
+            markers[triggered][STATE] = 1
+            if dir ==  1:
+                print("adjust")
+                index = markers[triggered][MIN]
+            else:
+                print("adjust")
+                index = markers[triggered][MAX]
+    return index
+
+def goto_coord(coord, index, stepper, axis, markers):
+    print("Goto axis index specified")
+    print("Update index to markers as triggered")
+    dir=-1  # set direction to initally move toward MIN
+    try:
+        power_supply_on()
+        if index == -1:
+            index = locate(stepper, axis, markers)
+        if coord > index:
+            dir=1
+        while index != coord:
+            index = step(index, stepper, dir)
+            triggered = marker_state(axis, markers)
+            index = check_transition(index, dir, triggered, markers)
+    finally:
+        GPIO.cleanup()
+        power_supply_off()
+    print("At index %s" % index)
+
+
 
 def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
     power_supply_on()
@@ -97,7 +165,7 @@ def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
     print("resetting to MIN")
     mk_min=markers[axis[0]][PIN]
     while GPIO.input(mk_min)==1:
-        step(stepper, direction=dir)
+        step(index, stepper, direction=dir)
     try:
       while True:
         triggered = marker_state(axis, markers)
@@ -134,9 +202,9 @@ def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
 #          print "step"
           pass
 
-        index=index+dir
+#        index=index+dir
+        index = step(index, stepper, direction=dir)
         print(index)
-        step(stepper, direction=dir)
     
     finally:
       GPIO.cleanup()
