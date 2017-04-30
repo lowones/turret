@@ -41,11 +41,13 @@ def main():
     atexit.register(turnOffMotors)
  
     setup_markers(x, markers)
+    setup_markers(y, markers)
 #    index = locate(x_stepper, x, markers)
 #    sweep(x_stepper, x, markers)
 #    sweep(x_stepper, x, markers, soft_min=5, soft_max=230)
 #    sweep(y_stepper, y, markers, soft_max=230)
     goto_coord(990, index,  x_stepper, x, markers)
+    goto_coord(20, index,  y_stepper, y, markers)
 
 def power_supply_on():
     print("turn atx power supply on")
@@ -107,18 +109,18 @@ def locate(stepper, axis, markers):
     return index
 
 def check_transition(index, dir, triggered, markers):
-    print("check if any marker has transitioned state")
+#    print("check if any marker has transitioned state")
     if triggered == -1:
         # check if any marker was triggered
         for marker in markers:
-            if markers[marker][STATE] == 1:
-                markers[marker][STATE] = 0
+            if marker[STATE] == 1:
+                marker[STATE] = 0
                 if dir ==  1:
                     print("adjust")
-                    index = markers[marker][MIN]
+                    index = marker[MIN]
                 else:
                     print("adjust")
-                    index = markers[marker][MAX]
+                    index = marker[MAX]
     else:
         # check if tiggered was already set
         if  markers[triggered][STATE] == 0:
@@ -146,7 +148,7 @@ def goto_coord(coord, index, stepper, axis, markers):
             triggered = marker_state(axis, markers)
             index = check_transition(index, dir, triggered, markers)
     finally:
-        GPIO.cleanup()
+#        GPIO.cleanup()
         power_supply_off()
     print("At index %s" % index)
 
