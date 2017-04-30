@@ -9,31 +9,64 @@ import time
 
 PIN=0
 STATE=1
-TRAN=2
-MIN=3
-MAX=4
+MIN=2
+MAX=3
 
 index = -1  # set to -1 initially for unkown location
 
 # create a default object, no changes to I2C address or frequency
 sh = Adafruit_MotorHAT()
+mh = Adafruit_MotorHAT(addr=0x61)
 x_stepper = sh.getStepper(200, 1)  # 200 steps/rev, motor port #2
 y_stepper = sh.getStepper(200, 2)  # 200 steps/rev, motor port #2
+flywheel = mh.getMotor(1)
+trigger = mh.getMotor(2)
 
+
+def get_power_level(power):
+    if power > 100:
+        print("Power cannot be greater than 100")
+        power=100
+    level=int(255.0/(100.0/float(power)))
+    print(level)
+    return level
+
+def shoot(F, T, percent=100, shots=1):
+    print("shoot gun")
+    trigger_power=100
+#    trigger_power=255
+    power_on_delay=4.0
+    one_shot_time=0.15
+    shot_duration=shots*one_shot_time
+    power=get_power_level(percent)
+    T.setSpeed(trigger_power)
+    F.run(Adafruit_MotorHAT.FORWARD)
+    F.setSpeed(power)
+    time.sleep(power_on_delay)
+    T.run(Adafruit_MotorHAT.FORWARD)
+    time.sleep(shot_duration)
+    T.run(Adafruit_MotorHAT.RELEASE)
+    F.run(Adafruit_MotorHAT.RELEASE)
+
+def main_thing():
+
+    while (True):
+        shoot(flywheel, trigger, percent=100, shots=3)
+        time.sleep(10.0)
 
 def main():
-    markers = [[17,0,0,1,1],
-               [20,0,0,225,245],
-               [16,0,0,635,660],
-               [12,0,0,1195,1220],
-               [25,0,0,1575,1595],
-               [24,0,0,1810,1810],
-               [26,0,0,1,1],
-               [19,0,0,45,65],
-               [13,0,0,85,100],
-               [6,0,0,105,120],
-               [5,0,0,140,165],
-               [22,0,0,300,300]
+    markers = [[17,0,1,1],
+               [20,0,225,245],
+               [16,0,635,660],
+               [12,0,1195,1220],
+               [25,0,1575,1595],
+               [24,0,1810,1810],
+               [26,0,1,1],
+               [19,0,45,65],
+               [13,0,85,100],
+               [6,0,005,120],
+               [5,0,040,165],
+               [22,0,300,300]
               ]
     x=[0,1,2,3,4,5]
     y=[6,7,8,9,10,11]
@@ -42,12 +75,14 @@ def main():
  
     setup_markers(x, markers)
     setup_markers(y, markers)
+# COMMANDS
 #    index = locate(x_stepper, x, markers)
 #    sweep(x_stepper, x, markers)
 #    sweep(x_stepper, x, markers, soft_min=5, soft_max=230)
 #    sweep(y_stepper, y, markers, soft_max=230)
-    goto_coord(990, index,  x_stepper, x, markers)
-    goto_coord(20, index,  y_stepper, y, markers)
+    goto_coord(730, index,  x_stepper, x, markers)
+    goto_coord(150, index,  y_stepper, y, markers)
+    shoot(flywheel, trigger, percent=90, shots=4)
 
 def power_supply_on():
     print("turn atx power supply on")
@@ -69,6 +104,7 @@ def setup_gpio_input(pin):
 def turnOffMotors():
     for i in [1,2,3,4]:
         sh.getMotor(i).run(Adafruit_MotorHAT.RELEASE)
+        mh.getMotor(i).run(Adafruit_MotorHAT.RELEASE)
 
 def step(index, motor, direction=-1):
     if direction ==  -1:
