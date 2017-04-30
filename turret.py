@@ -39,9 +39,15 @@ def main():
     atexit.register(turnOffMotors)
  
     setup_markers(x, markers)
-#    sweep(x_stepper, x, markers)
-    sweep(x_stepper, x, markers, soft_min=5, soft_max=230)
+    sweep(x_stepper, x, markers)
+#    sweep(x_stepper, x, markers, soft_min=5, soft_max=230)
 #    sweep(y_stepper, y, markers, soft_max=230)
+
+def power_supply_on():
+    print("turn atx power supply on")
+
+def power_supply_off():
+    print("turn atx power supply off")
 
 def setup_markers(axis, markers):
     print("setup markers")
@@ -68,10 +74,9 @@ def step(motor, direction=-1):
     motor.oneStep(DIR,  Adafruit_MotorHAT.INTERLEAVE)
 
 def marker_state(axis, markers):
-    print("get marker state")
     triggered_marker=-1
     count=0
-    for marker in markers:
+    for marker in axis:
         if GPIO.input(markers[marker][PIN])==0:
             triggered_marker=marker
             count+=1
@@ -80,31 +85,28 @@ def marker_state(axis, markers):
     return triggered_marker
 
 def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
+    power_supply_on()
     END_SLEEP=1.0
     MID_SLEEP=0.1
     print("sweep\n")
-    mk_min=markers[axis[0]][PIN]
-    mk_1=markers[axis[1]][PIN]
-    mk_2=markers[axis[2]][PIN]
-    mk_3=markers[axis[3]][PIN]
-    mk_4=markers[axis[4]][PIN]
-    mk_max=markers[axis[5]][PIN]
     index=0
     dir=-1
     print("soft_min = %s" % soft_min)
     print("soft_max = %s" % soft_max)
     time.sleep(5.0)
     print("resetting to MIN")
+    mk_min=markers[axis[0]][PIN]
     while GPIO.input(mk_min)==1:
         step(stepper, direction=dir)
     try:
       while True:
-        if GPIO.input(mk_min)==0:
+        triggered = marker_state(axis, markers)
+        if triggered==0:
           print "MIN"
           dir=1
           index=0
           time.sleep(END_SLEEP)
-        elif GPIO.input(mk_max)==0:
+        elif triggered==5:
           print "MAX"
           dir=-1
           time.sleep(END_SLEEP)
@@ -116,16 +118,16 @@ def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
           print "soft MIN limit"
           dir=1
           time.sleep(END_SLEEP)
-        elif GPIO.input(mk_1)==0:
+        elif triggered==1:
           print "mk-1"
           time.sleep(MID_SLEEP)
-        elif GPIO.input(mk_2)==0:
+        elif triggered==2:
           print "mk-2"
           time.sleep(MID_SLEEP)
-        elif GPIO.input(mk_3)==0:
+        elif triggered==3:
           print "mk-3"
           time.sleep(MID_SLEEP)
-        elif GPIO.input(mk_4)==0:
+        elif triggered==4:
           print "mk-4"
           time.sleep(MID_SLEEP)
         else:
@@ -138,6 +140,7 @@ def sweep(stepper, axis, markers, soft_min=-5000, soft_max=5000):
     
     finally:
       GPIO.cleanup()
+      power_supply_off()
 
 
 def check_ammo():
