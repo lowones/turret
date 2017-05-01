@@ -1,5 +1,5 @@
 #!/usr/bin/python
-#import Adafruit_MotorHAT, Adafruit_DCMotor, Adafruit_Stepper
+# This is a branch created while still debuging the shoot ramp up  turret.4
 from Adafruit_MotorHAT import Adafruit_MotorHAT, Adafruit_DCMotor, Adafruit_StepperMotor
 
 import time
@@ -71,20 +71,28 @@ def test_flywheel(F, percent=60):
 
 def shoot(F, T, percent=100, shots=1):
     power_supply_on()
+    print("shots %s" % shots)
 #    print("shoot gun")
     trigger_power=100
 #    trigger_power=255
     power_on_delay=3.0
     one_shot_time=0.15
     shot_clear_time=0.4
-    shot_duration=shots*one_shot_time
+#    shot_duration=shots*one_shot_time
     f_power=get_power_level(percent)
     T.setSpeed(trigger_power)
     F.run(Adafruit_MotorHAT.FORWARD)
     F.setSpeed(f_power)
     time.sleep(power_on_delay)
     T.run(Adafruit_MotorHAT.FORWARD)
-    time.sleep(shot_duration)
+    s_count = 0
+    while s_count < shots:
+        print("power %s" % f_power)
+        s_count+=1
+        if f_power < 249:
+            f_power+=5
+            F.setSpeed(f_power)
+        time.sleep(one_shot_time)
     T.run(Adafruit_MotorHAT.RELEASE)
     time.sleep(shot_clear_time)
     F.run(Adafruit_MotorHAT.RELEASE)
