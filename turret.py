@@ -8,6 +8,7 @@ import RPi.GPIO as GPIO
 import sys
 import tty
 import termios
+from itertools import cycle
 
 PIN=0
 STATE=1
@@ -66,14 +67,14 @@ def shoot(F, T, percent=100, shots=1):
     print("shoot gun")
     trigger_power=100
 #    trigger_power=255
-    power_on_delay=4.0
+    power_on_delay=3.0
     one_shot_time=0.15
     shot_clear_time=0.4
     shot_duration=shots*one_shot_time
-    power=get_power_level(percent)
+    f_power=get_power_level(percent)
     T.setSpeed(trigger_power)
     F.run(Adafruit_MotorHAT.FORWARD)
-    F.setSpeed(power)
+    F.setSpeed(f_power)
     time.sleep(power_on_delay)
     T.run(Adafruit_MotorHAT.FORWARD)
     time.sleep(shot_duration)
@@ -140,6 +141,7 @@ def step(motor, direction=-1):
         DIR=Adafruit_MotorHAT.FORWARD
     else:
         print("Invalid direction")
+    print("inside step, motor = %s direction = %s" % ( motor, DIR) )
     motor.oneStep(DIR,  Adafruit_MotorHAT.INTERLEAVE)
     index+=direction
     return index
@@ -296,7 +298,7 @@ def three():
 
 def menu():
   while True:
-    var = raw_input("Please enter something: ")
+    var = raw_input("COMMAND: ")
     if var.startswith( 'one' ):
       one()
     elif var.startswith( 'two' ):
@@ -324,46 +326,96 @@ def menu():
 
 def control():
   print("control mode")
+  power = 40
+  steps = 3
+  bullets = [1,2,3,4,5,6]
+  ammo = cycle(bullets)
+  rounds = ammo.next()
   power_supply_on()
+  print_controls()
   orig_setting = termios.tcgetattr(sys.stdin)
 
   tty.setraw(sys.stdin)
   x = 0
   while x != chr(27): # ESC
+    settings_updated=0
     x=sys.stdin.read(1)[0]
     if x == 'a':
 #      print("left\r")
-      manual_move(1, x_stepper, x)
+      manual_move(steps, 1, x_stepper, x)
     elif x == 'd':
 #      print("right\r")
-      manual_move(-1, x_stepper, x)
+      manual_move(steps, -1, x_stepper, x)
     elif x == 'w':
 #      print("up\r")
-      manual_move(1, y_stepper, y)
+      manual_move(steps, 1, y_stepper, y)
     elif x == 'x':
 #      print("down\r")
-      manual_move(-1, y_stepper, y)
+      manual_move(steps, -1, y_stepper, y)
     elif x == 's':
-      manual_shoot()
+      manual_shoot(power, rounds)
+      print("back in control\r")
+    elif x == '?':
+      print_controls()
+    elif x == 'r':
+      rounds =  ammo.next()
+      settings_updated=1
+    elif x == '+':
+      if power < 100:
+        power +=5
+        settings_updated=1
+    elif x == '-':
+      if power > 0:
+        power -=5
+        settings_updated=1
+    elif x == '[':
+      if steps > 1:
+        steps /=2
+        settings_updated=1
+    elif x == ']':
+      if steps < 100:
+        steps *=2
+        settings_updated=1
     else:
       print("You pressed %s\r" % x)
+
+    if steps < 1:
+        steps=1
+    if settings_updated == 1:
+        print_settings(power, rounds, steps)
+
 
   power_supply_off()
   print("\rLeaving control mode\r")
 
   termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_setting)
 
-def manual_move(direction, stepper, axis):
-#    print("manually move %s" % direction)
-    index = step(stepper, direction)
-    index = step(stepper, direction)
-    index = step(stepper, direction)
+def print_settings(power, rounds, steps):
+    print("Power Level = %s\tShoots = %s\tSteps = %s\r" % (power, rounds, steps) )
 
-def manual_shoot():
+def print_controls():
+    print("\n\n\r\t\t\tManual Controls")
+    print("\n\r\t\t\t\tw = UP")
+    print("\n\r\t\ta = LEFT        s = SHOOT        d = RIGHT")
+    print("\n\r\t\t\t\tx = DOWN")
+    print("\n\n\r\tr = CHANGE # SHOTS\t- = REDUCE POWER\t+ = INCREASE POWER")
+    print("\n\n\r\t? = HELP \t\t[ = REDUCE STEPS\t] = INCREASE STEPS")
+    print("\r")
+
+def manual_move(steps, direction, stepper, axis):
+    print("manually move %s\r" % direction)
+    print("steps %s stepper %s axis %s\r" % (steps, stepper, axis) )
+    count = 0
+    while count < steps:
+        print("loop")
+        index = step(stepper, direction)
+        count+=1
+
+def manual_shoot(power_level, rounds):
 #    print("shoot")
     sys.stdout.write('shoot')
+    shoot(flywheel, trigger, power_level, rounds)
     sys.stdout.flush()
-    time.sleep(2.0)
     termios.tcflush(sys.stdin, termios.TCIOFLUSH)
     print("\tdone\r")
 
