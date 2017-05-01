@@ -15,6 +15,8 @@ STATE=1
 MIN=2
 MAX=3
 
+orig_setting = termios.tcgetattr(sys.stdin)
+
 index = x_index = y_index  = -1  # set to -1 initially for unkown location
 
 # create a default object, no changes to I2C address or frequency
@@ -42,6 +44,11 @@ markers = [[17,0,1,1],
 x=[0,1,2,3,4,5]
 y=[6,7,8,9,10,11]
 
+x_min_limit = markers[x[0]][MIN]
+x_max_limit = markers[x[-1]][MAX]
+y_min_limit = markers[y[0]][MIN]
+y_max_limit = 222
+
 def get_power_level(power):
     if power > 100:
         print("Power cannot be greater than 100")
@@ -64,7 +71,7 @@ def test_flywheel(F, percent=60):
 
 def shoot(F, T, percent=100, shots=1):
     power_supply_on()
-    print("shoot gun")
+#    print("shoot gun")
     trigger_power=100
 #    trigger_power=255
     power_on_delay=3.0
@@ -114,12 +121,10 @@ def setup_gpio(atx, x_axis, y_axis):
         setup_gpio_input(marker[PIN])
 
 def power_supply_on():
-    print("turn atx power supply on")
     GPIO.output(atx_pin, 1)
     time.sleep(0.5)
 
 def power_supply_off():
-    print("turn atx power supply off")
     GPIO.output(atx_pin, 0)
 
 def setup_gpio_input(pin):
@@ -141,7 +146,6 @@ def step(motor, direction=-1):
         DIR=Adafruit_MotorHAT.FORWARD
     else:
         print("Invalid direction")
-    print("inside step, motor = %s direction = %s" % ( motor, DIR) )
     motor.oneStep(DIR,  Adafruit_MotorHAT.INTERLEAVE)
     index+=direction
     return index
@@ -298,7 +302,7 @@ def three():
 
 def menu():
   while True:
-    var = raw_input("COMMAND: ")
+    var = raw_input("\n\rCOMMAND: ")
     if var.startswith( 'one' ):
       one()
     elif var.startswith( 'two' ):
@@ -324,38 +328,38 @@ def menu():
         power = status[1]
         steps = status[2]
         rounds = status[3]
-        status = control(power, steps, rounds)
+        status = control(power, steps, rounds, help_msg=0)
         restart = status[0]
     elif var.startswith( 'quit' ):
-      quit()
+        power_supply_off()
+        GPIO.cleanup()
+        quit()
     else:
       three()
 
-def control(power=40, steps=3, rounds=2):
-  print("control mode")
+def control(power=40, steps=3, rounds=2, help_msg=1):
+  global orig_setting
   bullets = [1,2,3,4,5,6]
   ammo = cycle(bullets)
   power_supply_on()
-  print_controls()
-  orig_setting = termios.tcgetattr(sys.stdin)
-
+  if  help_msg == 1:
+        print("control mode\r")
+        print_controls()
+        orig_setting = termios.tcgetattr(sys.stdin)
+#  orig_setting = termios.tcgetattr(sys.stdin)
   tty.setraw(sys.stdin)
   x = 0
   while x != chr(27): # ESC
     settings_updated=0
     x=sys.stdin.read(1)[0]
     if x == 'a':
-#      print("left\r")
-      manual_move(steps, 1, x_stepper, x)
+      manual_move(steps, 1, x_stepper, x) # LEFT
     elif x == 'd':
-#      print("right\r")
-      manual_move(steps, -1, x_stepper, x)
+      manual_move(steps, -1, x_stepper, x) # RIGHT
     elif x == 'w':
-#      print("up\r")
-      manual_move(steps, 1, y_stepper, y)
+      manual_move(steps, 1, y_stepper, y) # UP
     elif x == 'x':
-#      print("down\r")
-      manual_move(steps, -1, y_stepper, y)
+      manual_move(steps, -1, y_stepper, y) # DOWN
     elif x == 's':
       manual_shoot(power, rounds)
       status = [1, power, steps, rounds]
@@ -389,13 +393,10 @@ def control(power=40, steps=3, rounds=2):
     if settings_updated == 1:
         print_settings(power, rounds, steps)
 
-
   power_supply_off()
-  print("\rLeaving control mode\r")
+  termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_setting)
   status = [0, power, steps, rounds]
   return status
-
-  termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_setting)
 
 def print_settings(power, rounds, steps):
     print("Power Level = %s\tShoots = %s\tSteps = %s\r" % (power, rounds, steps) )
@@ -410,11 +411,8 @@ def print_controls():
     print("\r")
 
 def manual_move(steps, direction, stepper, axis):
-    print("manually move %s\r" % direction)
-    print("steps %s stepper %s axis %s\r" % (steps, stepper, axis) )
     count = 0
     while count < steps:
-        print("loop")
         index = step(stepper, direction)
         count+=1
 
