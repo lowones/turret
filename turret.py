@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# This is a branch created while still debuging the shoot ramp up  turret.4
+#  
 from Adafruit_MotorHAT import Adafruit_MotorHAT, Adafruit_DCMotor, Adafruit_StepperMotor
 
 import time
@@ -71,7 +71,6 @@ def test_flywheel(F, percent=60):
 
 def shoot(F, T, percent=100, shots=1):
     power_supply_on()
-    print("shots %s" % shots)
 #    print("shoot gun")
     trigger_power=100
 #    trigger_power=255
@@ -87,7 +86,6 @@ def shoot(F, T, percent=100, shots=1):
     T.run(Adafruit_MotorHAT.FORWARD)
     s_count = 0
     while s_count < shots:
-        print("power %s" % f_power)
         s_count+=1
         if f_power < 249:
             f_power+=5
@@ -430,7 +428,7 @@ def manual_shoot(power_level, rounds):
     shoot(flywheel, trigger, power_level, rounds)
     sys.stdout.flush()
     termios.tcflush(sys.stdin, termios.TCIOFLUSH)
-    print("\tdone\r")
+    print("\tCLEAR\r")
 
 def manual():
     pass
