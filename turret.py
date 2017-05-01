@@ -5,7 +5,9 @@ from Adafruit_MotorHAT import Adafruit_MotorHAT, Adafruit_DCMotor, Adafruit_Step
 import time
 import atexit
 import RPi.GPIO as GPIO
-import time
+import sys
+import tty
+import termios
 
 PIN=0
 STATE=1
@@ -30,7 +32,7 @@ markers = [[17,0,1,1],
            [25,0,1575,1595],
            [24,0,1810,1810],
            [26,0,1,1],
-           [19,0,55,70],
+           [23,0,55,70],
            [13,0,90,105],
            [6,0,125,140],
            [5,0,165,185],
@@ -47,13 +49,26 @@ def get_power_level(power):
     print(level)
     return level
 
+def test_flywheel(F, percent=60):
+    power_on_delay=4.0
+    print("Test flywheel")
+    power_supply_on()
+    power=get_power_level(percent)
+    print("power level is %s" % power)
+    F.setSpeed(power)
+    F.run(Adafruit_MotorHAT.FORWARD)
+    time.sleep(power_on_delay)
+    F.run(Adafruit_MotorHAT.RELEASE)
+    power_supply_off()
+
 def shoot(F, T, percent=100, shots=1):
     power_supply_on()
     print("shoot gun")
     trigger_power=100
 #    trigger_power=255
-    power_on_delay=6.0
+    power_on_delay=4.0
     one_shot_time=0.15
+    shot_clear_time=0.4
     shot_duration=shots*one_shot_time
     power=get_power_level(percent)
     T.setSpeed(trigger_power)
@@ -63,32 +78,17 @@ def shoot(F, T, percent=100, shots=1):
     T.run(Adafruit_MotorHAT.FORWARD)
     time.sleep(shot_duration)
     T.run(Adafruit_MotorHAT.RELEASE)
+    time.sleep(shot_clear_time)
     F.run(Adafruit_MotorHAT.RELEASE)
     power_supply_off()
-
-def main_thing():
-
-    while (True):
-        shoot(flywheel, trigger, percent=100, shots=3)
-        time.sleep(10.0)
 
 def main():
     atexit.register(turnOffMotors)
  
     setup_gpio(atx_pin, x, y)
+#    waypoint(200, 100, 50, 0)
 # COMMANDS
-#    index = locate(x_stepper, x)
-#    sweep(x_stepper, x)
-#    sweep(x_stepper, x, soft_min=5, soft_max=230)
-#    sweep(y_stepper, y, soft_max=230)
-#    goto_coord(790, x_stepper, x)
-#    goto_coord(70, y_stepper, y)
-#    shoot(flywheel, trigger, percent=90, shots=4)
-    waypoint(820, 155, 100, 4)
-#    waypoint(200, 220, 60, 2)
-#    waypoint(1550, 160, 50, 2)
-#    sweep(y_stepper, y, soft_max=822)
-#    sweep(x_stepper, x)
+    menu()
 
 def waypoint(x_coord, y_coord, power_level, shots):
     global index
@@ -132,6 +132,7 @@ def turnOffMotors():
         mh.getMotor(i).run(Adafruit_MotorHAT.RELEASE)
 
 def step(motor, direction=-1):
+#    print("step")
     global index
     if direction ==  -1:
         DIR=Adafruit_MotorHAT.BACKWARD
@@ -228,8 +229,8 @@ def goto_coord(coord, stepper, axis):
 def sweep(stepper, axis, soft_min=-5000, soft_max=5000):
     global index
     power_supply_on()
-    END_SLEEP=0.5
-    MID_SLEEP=0.1
+    END_SLEEP=0.1
+    MID_SLEEP=0.0
     print("sweep\n")
     dir=-1
     print("soft_min = %s" % soft_min)
@@ -283,6 +284,94 @@ def sweep(stepper, axis, soft_min=-5000, soft_max=5000):
     finally:
 #      GPIO.cleanup()
       power_supply_off()
+
+def one():
+  print("1")
+
+def two():
+  print("2")
+
+def three():
+  print("3")
+
+def menu():
+  while True:
+    var = raw_input("Please enter something: ")
+    if var.startswith( 'one' ):
+      one()
+    elif var.startswith( 'two' ):
+      input = var.split()
+      input.pop(0)
+      for i in input:
+        try:
+          if int(i) in range(0,101):
+            print("good value")
+          else:
+            print("out of range")
+        except ValueError:
+          print("Not int")
+        print(i)
+        print type(i)
+      two()
+    elif var.startswith( 'manual' ):
+      manual()
+    elif var.startswith( 'control' ):
+      control()
+    elif var.startswith( 'quit' ):
+      quit()
+    else:
+      three()
+
+def control():
+  print("control mode")
+  power_supply_on()
+  orig_setting = termios.tcgetattr(sys.stdin)
+
+  tty.setraw(sys.stdin)
+  x = 0
+  while x != chr(27): # ESC
+    x=sys.stdin.read(1)[0]
+    if x == 'a':
+#      print("left\r")
+      manual_move(1, x_stepper, x)
+    elif x == 'd':
+#      print("right\r")
+      manual_move(-1, x_stepper, x)
+    elif x == 'w':
+#      print("up\r")
+      manual_move(1, y_stepper, y)
+    elif x == 'x':
+#      print("down\r")
+      manual_move(-1, y_stepper, y)
+    elif x == 's':
+      manual_shoot()
+    else:
+      print("You pressed %s\r" % x)
+
+  power_supply_off()
+  print("\rLeaving control mode\r")
+
+  termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_setting)
+
+def manual_move(direction, stepper, axis):
+#    print("manually move %s" % direction)
+    index = step(stepper, direction)
+    index = step(stepper, direction)
+    index = step(stepper, direction)
+
+def manual_shoot():
+#    print("shoot")
+    sys.stdout.write('shoot')
+    sys.stdout.flush()
+    time.sleep(2.0)
+    termios.tcflush(sys.stdin, termios.TCIOFLUSH)
+    print("\tdone\r")
+
+def manual():
+    pass
+
+if __name__=='__main__':
+        main()
 
 
 def check_ammo():
