@@ -447,8 +447,22 @@ def manual_move(steps, direction, stepper, axis):
     while count < steps:
         triggered = marker_state(axis)
         index = check_transition(direction, triggered)
+        if check_limit(triggered, direction, axis):
+            count+=1
+            continue
         index = step(stepper, direction)
         count+=1
+
+def check_limit(triggered, direction, axis):
+        if triggered > -1:
+            t = axis.index(triggered)
+            if t == 0 and  direction ==  -1:
+                print("At MIN\r")
+                return True
+            elif t == 5 and direction == 1:
+                print("At MAX\r")
+                return True
+        return False
 
 def manual_shoot(power_level, rounds):
 #    print("shoot")
