@@ -190,6 +190,16 @@ def marker_state(axis):
                 print("Error multiple markers triggered")
     return triggered_marker
 
+def get_axis(axis):
+    a = 'unknown'
+    if axis[0] == 0:
+        'x'
+    elif axis[0] == 6:
+        'y'
+    else:
+        print("unknown axis")
+    return a
+
 def locate(stepper, axis):
     global index
     global located
