@@ -49,6 +49,8 @@ x_max_limit = markers[x[-1]][MAX]
 y_min_limit = markers[y[0]][MIN]
 y_max_limit = 222
 
+located_x = located_y = 0        # set located to false initially
+
 def get_power_level(power):
     if power > 100:
         print("Power cannot be greater than 100")
@@ -104,6 +106,15 @@ def main():
 # COMMANDS
     menu()
 
+def check_coord(x_c, y_c):
+    if  x_c not in range(x_min_limit, x_max_limit):
+        print("X coord is out of range: %s - %s" % (x_min_limit, x_max_limit))
+        return False
+    if  y_c not in range(y_min_limit, y_max_limit):
+        print("X coord is out of range: %s - %s" % (y_min_limit, y_max_limit))
+        return False
+    return True
+
 def waypoint(x_coord, y_coord, power_level, shots):
     global index
     global x_index
@@ -139,9 +150,13 @@ def setup_gpio_input(pin):
 
 # recommended for auto-disabling motors on shutdown!
 def turnOffMotors():
+    global located_x
+    global located_y
     for i in [1,2,3,4]:
         sh.getMotor(i).run(Adafruit_MotorHAT.RELEASE)
         mh.getMotor(i).run(Adafruit_MotorHAT.RELEASE)
+    located_x = located_y = 0 
+
 
 def step(motor, direction=-1):
 #    print("step")
@@ -307,41 +322,41 @@ def three():
   print("3")
 
 def menu():
-  while True:
-    var = raw_input("\n\rCOMMAND: ")
-    if var.startswith( 'one' ):
-      one()
-    elif var.startswith( 'two' ):
-      input = var.split()
-      input.pop(0)
-      for i in input:
-        try:
-          if int(i) in range(0,101):
-            print("good value")
-          else:
-            print("out of range")
-        except ValueError:
-          print("Not int")
-        print(i)
-        print type(i)
-      two()
-    elif var.startswith( 'manual' ):
-      manual()
-    elif var.startswith( 'control' ):
-      status = control()
-      restart = status[0]
-      while restart == 1:
-        power = status[1]
-        steps = status[2]
-        rounds = status[3]
-        status = control(power, steps, rounds, help_msg=0)
-        restart = status[0]
-    elif var.startswith( 'quit' ):
-        power_supply_off()
-        GPIO.cleanup()
-        quit()
-    else:
-      three()
+    while True:
+        var = raw_input("\n\rCOMMAND: ")
+        if var.startswith( 'one' ):
+            one()
+        elif var.startswith( 'two' ):
+            input = var.split()
+            input.pop(0)
+            for i in input:
+                 try:
+                    if int(i) in range(0,101):
+                        print("good value")
+                    else:
+                        print("out of range")
+                 except ValueError:
+                     print("Not int")
+                 print(i)
+                 print type(i)
+            two()
+        elif var.startswith( 'manual' ):
+            manual()
+        elif var.startswith( 'control' ):
+            status = control()
+            restart = status[0]
+            while restart == 1:
+                power = status[1]
+                steps = status[2]
+                rounds = status[3]
+                status = control(power, steps, rounds, help_msg=0)
+                restart = status[0]
+        elif var.startswith( 'quit' ):
+            power_supply_off()
+            GPIO.cleanup()
+            quit()
+        else:
+            three()
 
 def control(power=40, steps=3, rounds=2, help_msg=1):
   global orig_setting
