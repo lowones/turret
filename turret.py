@@ -318,19 +318,23 @@ def menu():
     elif var.startswith( 'manual' ):
       manual()
     elif var.startswith( 'control' ):
-      control()
+      status = control()
+      restart = status[0]
+      while restart == 1:
+        power = status[1]
+        steps = status[2]
+        rounds = status[3]
+        status = control(power, steps, rounds)
+        restart = status[0]
     elif var.startswith( 'quit' ):
       quit()
     else:
       three()
 
-def control():
+def control(power=40, steps=3, rounds=2):
   print("control mode")
-  power = 40
-  steps = 3
   bullets = [1,2,3,4,5,6]
   ammo = cycle(bullets)
-  rounds = ammo.next()
   power_supply_on()
   print_controls()
   orig_setting = termios.tcgetattr(sys.stdin)
@@ -354,7 +358,8 @@ def control():
       manual_move(steps, -1, y_stepper, y)
     elif x == 's':
       manual_shoot(power, rounds)
-      print("back in control\r")
+      status = [1, power, steps, rounds]
+      return status
     elif x == '?':
       print_controls()
     elif x == 'r':
@@ -387,6 +392,8 @@ def control():
 
   power_supply_off()
   print("\rLeaving control mode\r")
+  status = [0, power, steps, rounds]
+  return status
 
   termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_setting)
 
