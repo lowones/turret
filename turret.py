@@ -49,7 +49,7 @@ x_max_limit = markers[x[-1]][MAX]
 y_min_limit = markers[y[0]][MIN]
 y_max_limit = 222
 
-located_x = located_y = 0        # set located to false initially
+located = located_x = located_y = 0        # set located to false initially
 
 def get_power_level(power):
     if power > 100:
@@ -155,7 +155,7 @@ def turnOffMotors():
     for i in [1,2,3,4]:
         sh.getMotor(i).run(Adafruit_MotorHAT.RELEASE)
         mh.getMotor(i).run(Adafruit_MotorHAT.RELEASE)
-    located_x = located_y = 0 
+    located = located_x = located_y = 0 
 
 
 def step(motor, direction=-1):
@@ -172,11 +172,19 @@ def step(motor, direction=-1):
     return index
 
 def marker_state(axis):
+    global located_x
+    global located_y
     triggered_marker=-1
     count=0
     for marker in axis:
         if GPIO.input(markers[marker][PIN])==0:
             triggered_marker=marker
+            if axis[0] == 0:
+                located_x=1
+            elif axis[0] == 6:
+                located_y=1
+            else:
+                print("Error in locate, unkown axis")
             count+=1
             if count > 1:
                 print("Error multiple markers triggered")
@@ -184,6 +192,7 @@ def marker_state(axis):
 
 def locate(stepper, axis):
     global index
+    global located
     dir=-1
     power_supply_on()
     try:
@@ -197,6 +206,8 @@ def locate(stepper, axis):
 #        GPIO.cleanup()
 #        power_supply_off()
         pass
+    if located_x == 1 and located_y == 1:
+        located = 1
     return index
 
 def check_transition(dir, triggered):
@@ -369,45 +380,45 @@ def control(power=40, steps=3, rounds=2, help_msg=1):
         orig_setting = termios.tcgetattr(sys.stdin)
 #  orig_setting = termios.tcgetattr(sys.stdin)
   tty.setraw(sys.stdin)
-  x = 0
-  while x != chr(27): # ESC
+  key = 0
+  while key != chr(27): # ESC
     settings_updated=0
-    x=sys.stdin.read(1)[0]
-    if x == 'a':
+    key=sys.stdin.read(1)[0]
+    if key == 'a':
       manual_move(steps, 1, x_stepper, x) # LEFT
-    elif x == 'd':
+    elif key == 'd':
       manual_move(steps, -1, x_stepper, x) # RIGHT
-    elif x == 'w':
+    elif key == 'w':
       manual_move(steps, 1, y_stepper, y) # UP
-    elif x == 'x':
+    elif key == 'x':
       manual_move(steps, -1, y_stepper, y) # DOWN
-    elif x == 's':
+    elif key == 's':
       manual_shoot(power, rounds)
       status = [1, power, steps, rounds]
       return status
-    elif x == '?':
+    elif key == '?':
       print_controls()
-    elif x == 'r':
+    elif key == 'r':
       rounds =  ammo.next()
       settings_updated=1
-    elif x == '+':
+    elif key == '+':
       if power < 100:
         power +=5
         settings_updated=1
-    elif x == '-':
+    elif key == '-':
       if power > 0:
         power -=5
         settings_updated=1
-    elif x == '[':
+    elif key == '[':
       if steps > 1:
         steps /=2
         settings_updated=1
-    elif x == ']':
+    elif key == ']':
       if steps < 100:
         steps *=2
         settings_updated=1
     else:
-      print("You pressed %s\r" % x)
+      print("You pressed %s\r" % key)
 
     if steps < 1:
         steps=1
@@ -434,6 +445,8 @@ def print_controls():
 def manual_move(steps, direction, stepper, axis):
     count = 0
     while count < steps:
+        triggered = marker_state(axis)
+        index = check_transition(direction, triggered)
         index = step(stepper, direction)
         count+=1
 
