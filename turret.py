@@ -347,6 +347,8 @@ def menu():
         var = raw_input("\n\rCOMMAND: ")
         if var.startswith( 'one' ):
             one()
+        elif var.startswith( 'target' ):
+            target(var)
         elif var.startswith( 'two' ):
             input = var.split()
             input.pop(0)
@@ -378,6 +380,50 @@ def menu():
             quit()
         else:
             three()
+
+def get_targets(search):
+    t = {
+            "josh":[1, 120, -1],
+            "scott":[90, 140, -1],
+            "ray":[180, 150, -1],
+            "sean":[290, 140, 40],
+            "empty":[290, 170, -1],
+            "bobby":[300, 190, 40],
+            "jeff":[430, 180, 50],
+            "clock":[515, 180, -1],
+            "derek":[600, 150, -1],
+            "dille":[700, 130, -1],
+            "david":[820, 130, -1],
+            "gen":[930, 125, -1],
+            "greg":[1150, 25, -1],
+            "alex":[1700, 120, -1]
+        }
+    for key in t.keys():
+        if search not in key:
+            del t[key]
+    return t
+
+def print_matches(matches):
+    columns=3
+    for element in range(len(matches)):
+        if not element%columns:
+            print("")
+        print("%2d %12s\t\t" % (element, matches[element])),
+
+def target(input_string):
+    search=''
+    print("input to target: %s" % input_string)
+    arguments = input_string.split()
+    if arguments[0] != 'target':
+        print("command must be target")
+    elif len(arguments) > 2:
+        print("too many arguments")
+    elif len(arguments) == 2:
+        search = arguments[1]
+        print("search for %s" % search)
+    victims = get_targets(search)
+    print("Number of victims is %s" % len(victims) )
+    print_matches(victims.keys())
 
 def control(power=40, steps=3, rounds=2, help_msg=1):
   global orig_setting
