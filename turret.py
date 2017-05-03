@@ -348,6 +348,7 @@ def menu():
         if var.startswith( 'one' ):
             one()
         elif var.startswith( 'target' ):
+#            target(var)
             target(var)
         elif var.startswith( 'two' ):
             input = var.split()
@@ -410,9 +411,9 @@ def print_matches(matches):
             print("")
         print("%2d %12s\t\t" % (element, matches[element])),
 
+
 def target(input_string):
     search=''
-    print("input to target: %s" % input_string)
     arguments = input_string.split()
     if arguments[0] != 'target':
         print("command must be target")
@@ -420,10 +421,30 @@ def target(input_string):
         print("too many arguments")
     elif len(arguments) == 2:
         search = arguments[1]
-        print("search for %s" % search)
     victims = get_targets(search)
-    print("Number of victims is %s" % len(victims) )
-    print_matches(victims.keys())
+    victim = ''
+    candidates = victims.keys()
+    if len(victims) < 1:
+        print("No matching targets")
+        return
+    elif len(victims) == 1:
+        victim = candidates[0]
+    while victim == '':
+        print_matches(candidates)
+        prompt="\n\nChoose a victim : "
+        try:
+            ans = int(raw_input(prompt))
+        except ValueError:
+            ans = ''
+        print("answer is %s" % ans)
+        if ans in range(0, len(candidates)):
+            print("good answer")
+            victim = candidates[ans]
+    x = victims[victim][0]
+    y = victims[victim][1]
+    power = victims[victim][2]
+    print("the lucky one is %s" % victim)
+    print("x:%s\ty:%s\tpower:%s" % (x, y, power))
 
 def control(power=40, steps=3, rounds=2, help_msg=1):
   global orig_setting
