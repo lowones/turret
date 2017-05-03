@@ -331,7 +331,7 @@ def two():
 def three():
   print("3")
 
-def get_targets():
+def get_targets(search):
     t = {
             "josh":[10, 80, -1],
             "scott":[30, 80, -1],
@@ -346,6 +346,9 @@ def get_targets():
             "greg":[800, 50, -1],
             "zoorn":[900, 50, -1]
         }
+    for key in t.keys():
+        if search not in key:
+            del t[key]
     return t
 
 def print_matches(matches):
@@ -366,8 +369,30 @@ def name(input_string):
     elif len(arguments) == 2:
         search = arguments[1]
         print("search for %s" % search)
-    victims = get_targets()
-    print_matches(victims.keys())
+    victims = get_targets(search)
+    victim = ''
+    candidates = victims.keys()
+    if len(victims) < 1:
+        print("No matching targets")
+        return
+    elif len(victims) == 1:
+        victim = candidates[0]
+    while victim == '':
+        print_matches(candidates)
+        prompt="\n\nChoose a victim : "
+        try:
+            ans = int(raw_input(prompt))
+        except ValueError:
+            ans = ''
+        print("answer is %s" % ans)
+        if ans in range(0, len(candidates)):
+            print("good answer")
+            victim = candidates[ans]
+    x = victims[victim][0]
+    y = victims[victim][1]
+    power = victims[victim][2]
+    print("the lucky one is %s" % victim)
+    print("x:%s\ty:%s\tpower:%s" % (x, y, power))
 
 def menu():
     while True:
