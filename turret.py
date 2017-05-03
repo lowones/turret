@@ -348,8 +348,9 @@ def menu():
         if var.startswith( 'one' ):
             one()
         elif var.startswith( 'target' ):
-#            target(var)
             target(var)
+        elif var.startswith( 'power' ):
+            set_power(var)
         elif var.startswith( 'two' ):
             input = var.split()
             input.pop(0)
@@ -411,6 +412,15 @@ def print_matches(matches):
             print("")
         print("%2d %12s\t\t" % (element, matches[element])),
 
+def set_power(input_string):
+    search=''
+    arguments = input_string.split()
+    if arguments[0] != 'power':
+        print("command must be power")
+    elif len(arguments) > 2:
+        print("too many arguments")
+    elif len(arguments) == 2:
+        power_value  = arguments[1]
 
 def target(input_string):
     search=''
@@ -443,8 +453,10 @@ def target(input_string):
     x = victims[victim][0]
     y = victims[victim][1]
     power = victims[victim][2]
-    print("the lucky one is %s" % victim)
-    print("x:%s\ty:%s\tpower:%s" % (x, y, power))
+    if power == -1:
+        power = 40
+    rounds = 2
+    waypoint(x, y, power, rounds)
 
 def control(power=40, steps=3, rounds=2, help_msg=1):
   global orig_setting
@@ -469,6 +481,8 @@ def control(power=40, steps=3, rounds=2, help_msg=1):
       manual_move(steps, 1, y_stepper, y) # UP
     elif key == 'x':
       manual_move(steps, -1, y_stepper, y) # DOWN
+    elif key == '.':
+      settings_updated=1
     elif key == 's':
       manual_shoot(power, rounds)
       status = [1, power, steps, rounds]
