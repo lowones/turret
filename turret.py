@@ -10,6 +10,9 @@ import tty
 import termios
 from itertools import cycle
 
+POWER=40
+ROUNDS=2
+
 PIN=0
 STATE=1
 MIN=2
@@ -72,6 +75,9 @@ def test_flywheel(F, percent=60):
     power_supply_off()
 
 def shoot(F, T, percent=100, shots=1):
+    if shots == 0:
+        print("This is just a threat")
+        return
     power_supply_on()
 #    print("shoot gun")
     trigger_power=100
@@ -116,16 +122,11 @@ def check_coord(x_c, y_c):
     return True
 
 def waypoint(x_coord, y_coord, power_level, shots):
-    global index
-    global x_index
-    global y_index
     power_supply_on()
-    index = x_index
     print("goto X %s" % x_coord)
-    x_index = goto_coord(x_coord, x_stepper, x)
-    index = y_index
+    goto_coord(x_coord, x_stepper, x)
     print("goto Y %s" % y_coord)
-    y_index = goto_coord(y_coord, y_stepper, y)
+    goto_coord(y_coord, y_stepper, y)
     shoot(flywheel, trigger, power_level, shots)
     time.sleep(2.0)
     power_supply_off()
@@ -158,9 +159,7 @@ def turnOffMotors():
     located = located_x = located_y = 0 
 
 
-def step(motor, direction=-1):
-#    print("step")
-    global index
+def step(index, motor, direction=-1):
     if direction ==  -1:
         DIR=Adafruit_MotorHAT.BACKWARD
     elif direction == 1:
@@ -179,9 +178,10 @@ def marker_state(axis):
     for marker in axis:
         if GPIO.input(markers[marker][PIN])==0:
             triggered_marker=marker
-            if axis[0] == 0:
+            axis_plane = figure_axis(axis)
+            if axis_plane == 'x':
                 located_x=1
-            elif axis[0] == 6:
+            elif axis_plane == 'y':
                 located_y=1
             else:
                 print("Error in locate, unkown axis")
@@ -190,25 +190,46 @@ def marker_state(axis):
                 print("Error multiple markers triggered")
     return triggered_marker
 
-def get_axis(axis):
+def set_index(plane, index):
+    global x_index
+    global y_index
+    if plane == 'x':
+        x_index = index
+    elif plane == 'y':
+        y_index = index
+    else:
+        print("Unkown plane")
+        return -1
+
+def get_index(plane):
+    global x_index
+    global y_index
+    if plane == 'x':
+        return x_index
+    elif plane == 'y':
+        return y_index
+    else:
+        print("Unkown plane")
+        return -1
+
+def figure_axis(axis):
     a = 'unknown'
     if axis[0] == 0:
-        'x'
+        a = 'x'
     elif axis[0] == 6:
-        'y'
+        a = 'y'
     else:
         print("unknown axis")
     return a
 
-def locate(stepper, axis):
-    global index
+def locate(index, stepper, axis):
     global located
     dir=-1
     power_supply_on()
     try:
         triggered = marker_state(axis)
         while triggered == -1:
-            step(stepper, direction=dir)
+            step(index, stepper, direction=dir)
             triggered = marker_state(axis)
         index = markers[triggered][MAX]
         print("The located index is %s for marker %s" % (index, triggered) )
@@ -220,47 +241,47 @@ def locate(stepper, axis):
         located = 1
     return index
 
-def check_transition(dir, triggered):
-    global index
+def check_transition(index, dir, triggered):
     if triggered == -1:
         # check if any marker was triggered
         for marker in markers:
             if marker[STATE] == 1:
                 marker[STATE] = 0
                 if dir ==  1:
-                    print("adjust")
                     index = marker[MIN]
+                    print("adjust %s" % index)
                 else:
-                    print("adjust")
                     index = marker[MAX]
+                    print("adjust %s" % index)
     else:
         # check if tiggered was already set
         if  markers[triggered][STATE] == 0:
             markers[triggered][STATE] = 1
             if dir ==  1:
-                print("adjust")
                 index = markers[triggered][MIN]
+                print("adjust %s" % index)
             else:
-                print("adjust")
                 index = markers[triggered][MAX]
+                print("adjust %s" % index)
     return index
 
 def goto_coord(coord, stepper, axis):
-    global index
+    a_plane = figure_axis(axis)
+    index = get_index(a_plane)
     print("Goto axis index specified")
     print("Update index to markers as triggered")
     dir=-1  # set direction to initally move toward MIN
     try:
         if index == -1:
-            index = locate(stepper, axis)
+            index = locate(index, stepper, axis)
         if coord > index:
             dir=1
         while index != coord:
-            index = step(stepper, dir)
+            index = step(index, stepper, dir)
             print(index)
             manual_index = index
             triggered = marker_state(axis)
-            index = check_transition(dir, triggered)
+            index = check_transition(index, dir, triggered)
             gap = [manual_index, index]
             gap.sort()
             if coord in range(gap[0], gap[1]):
@@ -270,12 +291,14 @@ def goto_coord(coord, stepper, axis):
 #        power_supply_off()
         pass
     print("At index %s" % index)
+    set_index(a_plane, index)
     return index
 
 
 
 def sweep(stepper, axis, soft_min=-5000, soft_max=5000):
-    global index
+    a_plane = figure_axis(axis)
+    index = get_index(a_plane)
     power_supply_on()
     END_SLEEP=0.1
     MID_SLEEP=0.0
@@ -287,7 +310,7 @@ def sweep(stepper, axis, soft_min=-5000, soft_max=5000):
     print("resetting to MIN")
     mk_min=markers[axis[0]][PIN]
     while GPIO.input(mk_min)==1:
-        step(stepper, direction=dir)
+        step(index, stepper, direction=dir)
     print("starting sweep")
     try:
       while True:
@@ -326,8 +349,9 @@ def sweep(stepper, axis, soft_min=-5000, soft_max=5000):
         else:
           pass
 
-        index = step(stepper, direction=dir)
+        index = step(index, stepper, direction=dir)
         print(index)
+        set_index(a_plane, index)
     
     finally:
 #      GPIO.cleanup()
@@ -349,6 +373,8 @@ def menu():
             one()
         elif var.startswith( 'target' ):
             target(var)
+        elif var.startswith( 'rounds' ):
+            set_rounds(var)
         elif var.startswith( 'power' ):
             set_power(var)
         elif var.startswith( 'two' ):
@@ -365,6 +391,10 @@ def menu():
                  print(i)
                  print type(i)
             two()
+        elif var.startswith( 'status' ):
+            print_status()
+        elif var.startswith( 'coord' ):
+            print_location()
         elif var.startswith( 'manual' ):
             manual()
         elif var.startswith( 'control' ):
@@ -383,6 +413,7 @@ def menu():
         else:
             three()
 
+
 def get_targets(search):
     t = {
             "josh":[1, 120, -1],
@@ -396,9 +427,9 @@ def get_targets(search):
             "derek":[600, 150, -1],
             "dille":[700, 130, -1],
             "david":[820, 130, -1],
-            "gen":[930, 125, -1],
+            "gen":[530, 125, -1],
             "greg":[1150, 25, -1],
-            "alex":[1700, 120, -1]
+            "alex":[1750, 120, -1]
         }
     for key in t.keys():
         if search not in key:
@@ -412,7 +443,33 @@ def print_matches(matches):
             print("")
         print("%2d %12s\t\t" % (element, matches[element])),
 
+def set_rounds(input_string):
+    global ROUNDS
+    r_min = 0
+    r_max = 6
+    search=''
+    arguments = input_string.split()
+    if arguments[0] != 'rounds':
+        print("command must be rounds")
+    elif len(arguments) > 2:
+        print("too many arguments")
+    elif len(arguments) == 2:
+        rounds_value  = arguments[1]
+        try:
+            rounds_value = int(rounds_value)
+        except ValueError:
+            print("Must enter interger")
+            return
+        if rounds_value not in range(r_min,r_max+1):
+            print("Rounds must be between %s - %s" % (r_min, r_max))
+            return
+        ROUNDS = rounds_value
+        print_status()
+
 def set_power(input_string):
+    global POWER
+    p_min = 0
+    p_max = 100
     search=''
     arguments = input_string.split()
     if arguments[0] != 'power':
@@ -421,6 +478,16 @@ def set_power(input_string):
         print("too many arguments")
     elif len(arguments) == 2:
         power_value  = arguments[1]
+        try:
+            power_value = int(power_value)
+        except ValueError:
+            print("Must enter interger")
+            return
+        if power_value not in range(p_min,p_max+1):
+            print("Power must be between %s - %s" % (p_min, p_max))
+            return
+        POWER = power_value
+        print_status()
 
 def target(input_string):
     search=''
@@ -455,12 +522,13 @@ def target(input_string):
     power = victims[victim][2]
     if power == -1:
         power = 40
-    rounds = 2
+    rounds = 0
     waypoint(x, y, power, rounds)
+    print_location()
 
 def control(power=40, steps=3, rounds=2, help_msg=1):
   global orig_setting
-  bullets = [1,2,3,4,5,6]
+  bullets = [0,1,2,3,4,5,6]
   ammo = cycle(bullets)
   power_supply_on()
   if  help_msg == 1:
@@ -515,11 +583,25 @@ def control(power=40, steps=3, rounds=2, help_msg=1):
         steps=1
     if settings_updated == 1:
         print_settings(power, rounds, steps)
+    
+    print_location()
 
   power_supply_off()
   termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_setting)
   status = [0, power, steps, rounds]
   return status
+
+def print_status():
+    global x_index
+    global y_index
+    global POWER
+    global ROUNDS
+    print("x : %4d\ty : %4d\tpower : %3d\trounds : %d" % ( x_index, y_index, POWER, ROUNDS) )
+
+def print_location():
+    global x_index
+    global y_index
+    print("\tx : %4d\ty : %4d\r" % (x_index, y_index))
 
 def print_settings(power, rounds, steps):
     print("Power Level = %s\tShoots = %s\tSteps = %s\r" % (power, rounds, steps) )
@@ -534,15 +616,18 @@ def print_controls():
     print("\r")
 
 def manual_move(steps, direction, stepper, axis):
+    a_plane = figure_axis(axis)
+    index = get_index(a_plane)
     count = 0
     while count < steps:
         triggered = marker_state(axis)
-        index = check_transition(direction, triggered)
+        index = check_transition(index, direction, triggered)
         if check_limit(triggered, direction, axis):
             count+=1
             continue
-        index = step(stepper, direction)
+        index = step(index, stepper, direction)
         count+=1
+    set_index(a_plane, index)
 
 def check_limit(triggered, direction, axis):
         if triggered > -1:
